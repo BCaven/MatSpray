@@ -38,16 +38,16 @@ def load_pfm(file: str):
     return np.ascontiguousarray(data)
 
 def load_img_rgb(path):
-    
+    # TODO: make sure this is not creating unnecessarily large images (float64)
     if path.endswith(".exr"):
         exr_file = pyexr.open(path)
         img = exr_file.get()
         img[..., 0:3] = rgb_to_srgb(img[..., 0:3], clip=False)
     else:
         img = imageio.imread(path)
-        img = img / 255
+        img = img.astype(np.float32) / 255.0
         # img[..., 0:3] = srgb_to_rgb(img[..., 0:3])
-    return img
+    return np.ascontiguousarray(img, dtype=np.float32)
 
 def load_mask_bool(mask_file):
     mask = imageio.imread(mask_file, mode='L')

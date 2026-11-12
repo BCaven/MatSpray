@@ -234,8 +234,8 @@ namespace osc
         OPTIX_CHECK(optixModuleCreate(optixContext,
                                       &moduleCompileOptions,
                                       &pipelineCompileOptions,
-                                      ptxCode.c_str(),
-                                      ptxCode.size(),
+                                      ptxCode_slang.c_str(),
+                                      ptxCode_slang.size(),
                                       log, &sizeof_log,
                                       &module));
 #else

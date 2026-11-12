@@ -47,7 +47,9 @@ set(gdt_dir ${PROJECT_SOURCE_DIR}/common/gdt/)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${gdt_dir}/cmake/")
 include(${gdt_dir}/cmake/configure_build_type.cmake)
 include(${gdt_dir}/cmake/configure_optix.cmake)
-include(${gdt_dir}/cmake/configure_slang.cmake)
+
+# This is not real anymore
+# include(${gdt_dir}/cmake/configure_slang.cmake)
 
 #set(glfw_dir ${PROJECT_SOURCE_DIR}/submodules/glfw/)
 #include(${gdt_dir}/cmake/configure_glfw.cmake)

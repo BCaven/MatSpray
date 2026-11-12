@@ -3,8 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 from utils.graphics_utils import getWorld2View2, getProjectionMatrix, getProjectionMatrixCenterShift
-
-
+from scene.utils import load_img_rgb
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, fx, fy, cx, cy, image, image_name, uid,
                  trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device="cuda",
@@ -34,8 +33,8 @@ class Camera(nn.Module):
 
         if image is not None:
             self.original_image = image.clamp(0.0, 1.0).to(self.data_device)
-            self.image_width = self.original_image.shape[2]
-            self.image_height = self.original_image.shape[1]
+            self.image_width = original_image.shape[2]
+            self.image_height = original_image.shape[1]
         else:
             self.image_width = width
             self.image_height = height
@@ -43,18 +42,18 @@ class Camera(nn.Module):
         if depth is not None:
             self.depth = depth
         else:
-            self.depth = torch.zeros((1, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
-
+            # self.depth = torch.zeros((1, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
+            pass
         if normal is not None:
-            self.normal = normal
+             self.normal = normal
         else:
-            self.normal = torch.zeros((3, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
-
+            # self.normal = torch.zeros((3, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
+            pass
         if image_mask is not None:
             self.image_mask = image_mask
         else:
-            self.image_mask = torch.ones_like(self.depth)
-
+            # self.image_mask = torch.ones_like(self.depth)
+            pass
         self.zfar = 100.0
         self.znear = 0.01
 
@@ -145,3 +144,67 @@ class Camera(nn.Module):
     @staticmethod
     def create_for_gui():
         return Camera(0, np.eye(3), np.zeros(3), 50, 50, None, None, "gui", "gui")
+
+    def load_image(self):
+        '''
+        Load the image when requested (i.e. not at the start)
+        '''
+
+        resolution = (int(self.image_height / self.scale), int(self.image_width / self.scale))
+        gt_image = load_img_rgb(self.image_path)
+        original_image = (
+            torch.from_numpy(gt_image)
+            .float()
+            .permute(2, 0, 1)
+            .contiguous()
+            .to(self.data_device)
+        )
+        torch_image = original_image
+        if self.scale != 1:
+            torch_image = torchvision.transforms.Resize(resolution, antialias=True)(original_image)
+
+        self.original_image = torch_image
+        # TODO: load the depth/normal/roughness/etc images here too
+        '''
+        resized_depth = None
+        if cam_info.depth is not None:
+            depth = torch.from_numpy(cam_info.depth).float().unsqueeze(0)
+            resized_depth = torchvision.transforms.Resize(
+                resolution, interpolation=InterpolationMode.NEAREST)(depth)
+
+        resized_normal = None
+        if cam_info.normal is not None:
+            normal = torch.from_numpy(cam_info.normal).float().permute(2, 0, 1)
+            resized_normal = torchvision.transforms.Resize(
+                resolution, interpolation=InterpolationMode.NEAREST)(normal)
+
+        resized_image_mask = None
+        if cam_info.image_mask is not None:
+            image_mask = torch.from_numpy(cam_info.image_mask).float().unsqueeze(0)
+            resized_image_mask = torchvision.transforms.Resize(
+                resolution, interpolation=InterpolationMode.NEAREST)(image_mask)
+
+        if depth is not None:
+            self.depth = depth
+        else:
+            # self.depth = torch.zeros((1, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
+            pass
+        if normal is not None:
+             self.normal = normal
+        else:
+            # self.normal = torch.zeros((3, self.image_height, self.image_width), dtype=torch.float32, device=data_device)
+            pass
+        if image_mask is not None:
+            self.image_mask = image_mask
+        else:
+            # self.image_mask = torch.ones_like(self.depth)
+            pass
+        '''
+        return
+
+    def destroy_image(self):
+        if hasattr(self, 'original_image'):
+            del self.original_image
+
+        if hasattr(self, 'image_mask'):
+            del self.image_mask

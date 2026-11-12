@@ -34,7 +34,7 @@ from utils.training.render_debug import create_timelapse_video, render_timelapse
 from utils.training.reporting import eval_render, save_training_vis, training_report
 
 
-def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams, is_pbr=False):
+def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams, is_pbr=False, default_device="cuda"):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
 
@@ -65,15 +65,15 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
                         projected_metallic = np.load(os.path.join(mlp_data_dir, "projected_metallic.npy"))
                         
                         # Convert to tensors and store (not trainable)
-                        gaussians.projected_base_colors = torch.tensor(projected_base_colors, dtype=torch.float, device="cuda", requires_grad=False)
-                        gaussians.projected_roughness = torch.tensor(projected_roughness, dtype=torch.float, device="cuda", requires_grad=False)
-                        gaussians.projected_metallic = torch.tensor(projected_metallic, dtype=torch.float, device="cuda", requires_grad=False)
+                        gaussians.projected_base_colors = torch.tensor(projected_base_colors, dtype=torch.float, device=default_device, requires_grad=False)
+                        gaussians.projected_roughness = torch.tensor(projected_roughness, dtype=torch.float, device=default_device, requires_grad=False)
+                        gaussians.projected_metallic = torch.tensor(projected_metallic, dtype=torch.float, device=default_device, requires_grad=False)
                         
                         # Load normal MLP data if it exists and normals_folder is provided
                         if mlp_metadata.get('has_normal_mlp', False) and getattr(args, 'normals_folder', None) is not None:
                             try:
                                 projected_normals = np.load(os.path.join(mlp_data_dir, "projected_normals.npy"))
-                                gaussians.projected_normals = torch.tensor(projected_normals, dtype=torch.float, device="cuda", requires_grad=False)
+                                gaussians.projected_normals = torch.tensor(projected_normals, dtype=torch.float, device=default_device, requires_grad=False)
                                 print(f"  - Normal MLP data loaded, shape: {gaussians.projected_normals.shape}")
                             except Exception as e:
                                 print(f"Warning: Failed to load normal MLP data: {e}")
@@ -166,15 +166,15 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
                         projected_base_colors = np.load(os.path.join(mlp_data_dir, "projected_base_colors.npy"))
                         projected_roughness = np.load(os.path.join(mlp_data_dir, "projected_roughness.npy"))
                         projected_metallic = np.load(os.path.join(mlp_data_dir, "projected_metallic.npy"))
-                        gaussians.projected_base_colors = torch.tensor(projected_base_colors, dtype=torch.float, device="cuda", requires_grad=False)
-                        gaussians.projected_roughness = torch.tensor(projected_roughness, dtype=torch.float, device="cuda", requires_grad=False)
-                        gaussians.projected_metallic = torch.tensor(projected_metallic, dtype=torch.float, device="cuda", requires_grad=False)
+                        gaussians.projected_base_colors = torch.tensor(projected_base_colors, dtype=torch.float, device=default_device, requires_grad=False)
+                        gaussians.projected_roughness = torch.tensor(projected_roughness, dtype=torch.float, device=default_device, requires_grad=False)
+                        gaussians.projected_metallic = torch.tensor(projected_metallic, dtype=torch.float, device=default_device, requires_grad=False)
                         
                         # Load normal MLP data if it exists and normals_folder is provided
                         if mlp_metadata.get('has_normal_mlp', False) and getattr(args, 'normals_folder', None) is not None:
                             try:
                                 projected_normals = np.load(os.path.join(mlp_data_dir, "projected_normals.npy"))
-                                gaussians.projected_normals = torch.tensor(projected_normals, dtype=torch.float, device="cuda", requires_grad=False)
+                                gaussians.projected_normals = torch.tensor(projected_normals, dtype=torch.float, device=default_device, requires_grad=False)
                                 print(f"  - Normal MLP data loaded, shape: {gaussians.projected_normals.shape}")
                             except Exception as e:
                                 print(f"Warning: Failed to load normal MLP data: {e}")
@@ -386,7 +386,7 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
     """ Prepare render function and bg"""
     render_fn = render_fn_dict[args.type]
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
-    background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+    background = torch.tensor(bg_color, dtype=torch.float32, device=default_device)
 
     # Optional: dump all per-view normal GTs at the start using the exact training transformation
     if getattr(args, 'dump_normals_at_start', False) and getattr(args, 'normal_gt_folder', None) is not None:
@@ -776,10 +776,10 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
 
         # Initialize loss as a Tensor to avoid .backward() errors when skipping photo loss
         # Use a known device (background tensor) since viewpoint_cam isn't set yet
-        init_device = background.device if isinstance(background, torch.Tensor) else ("cuda" if torch.cuda.is_available() else "cpu")
+        init_device = background.device if isinstance(background, torch.Tensor) else (default_device if torch.cuda.is_available() else "cpu")
         loss = torch.tensor(0.0, device=init_device)
         viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack) - 1))
-
+        viewpoint_cam.load_image()
         # Render
         if (iteration - 1) == args.debug_from:
             pipe.debug = True
@@ -967,7 +967,7 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
             gt_image = gt_image_full
             if gt_image.dim() == 3 and gt_image.shape[0] > 3:
                 gt_image = gt_image[:3, ...]
-            gt_mask = torch.ones((1, gt_image.shape[1], gt_image.shape[2])).to("cuda")
+            gt_mask = torch.ones((1, gt_image.shape[1], gt_image.shape[2])).to(default_device)
         
         # Apply mask to RGB channels of ground truth
         gt_mask_3c = gt_mask.repeat(3, 1, 1) if gt_mask.shape[0] == 1 else gt_mask
@@ -1652,7 +1652,8 @@ def training(dataset: ModelParams, opt: OptimizationParams, pipe: PipelineParams
                     print("[ITER {}] Saving {} Checkpoint".format(iteration, com_name))
 
 
-
+    # delete the tensors
+    viewpoint_cam.destroy_image()
     if dataset.eval:
         eval_render(scene, gaussians, render_fn, pipe, background, opt, pbr_kwargs, args)
     
@@ -1725,6 +1726,8 @@ if __name__ == "__main__":
                         help="Use a single combined MLP instead of three separate MLPs for base_color, roughness, and metallic. Only effective when --use_mlp is set.")
     parser.add_argument("--enable_gradient_logging", action="store_true", default=False,
                         help="Enable gradient logging for MLPs to diagnose training issues.")
+    parser.add_argument("--device", type=str, default="cuda", help="choose which device to use.")
+
     args = parser.parse_args(sys.argv[1:])
 
     print(f"Current model path: {args.model_path}")
@@ -1737,7 +1740,7 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
 
     is_pbr = args.type in ['neilf', 'neilf_deferred']
-    training(lp.extract(args), op.extract(args), pp.extract(args), is_pbr=is_pbr)
+    training(lp.extract(args), op.extract(args), pp.extract(args), is_pbr=is_pbr, default_device=args.device)
 
     # All done
     print("\nTraining complete.")

@@ -173,7 +173,7 @@ void ellipsoid_intersection()
 [shader("closesthit")]
 void closesthit_radiance(
   inout PerRayData prd : SV_RayPayload,
-  uint32_t out_dist : SV_Attribute0)
+  uint32_t out_dist) // : SV_Attribute0)
 {
   const int ix = DispatchRaysIndex().x;
   const int iy = DispatchRaysIndex().y;
@@ -184,7 +184,8 @@ void closesthit_radiance(
   const float3 rayOrigin = WorldRayOrigin();
   const float3 rayDir = WorldRayDirection();
   const float t0 = RayTCurrent();
-  const float t1 = asfloat(out_dist);
+
+  const float t1 = asfloat(out_dist); // TODO: remember to fix this :)
 
   float3 center = float3(centers[primIdx * 3 + 0],
                          centers[primIdx * 3 + 1],

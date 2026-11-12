@@ -278,6 +278,7 @@ def render(viewpoint_camera: Camera, pc: GaussianModel, pipe, bg_color: torch.Te
     """
     # Ensure camera resolution matches ground-truth image if GT not yet loaded
     if not hasattr(viewpoint_camera, 'original_image') or viewpoint_camera.original_image is None:
+        print("Oops, original_image was None and this is loading it again")
         from scene.utils import load_img_rgb
         assert hasattr(viewpoint_camera, 'image_path') and viewpoint_camera.image_path is not None, "Camera has no original_image and no image_path for lazy load"
         img_np = load_img_rgb(viewpoint_camera.image_path)

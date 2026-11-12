@@ -8,7 +8,7 @@
  *
  * For inquiries contact  george.drettakis@inria.fr
  */
-
+#include <cfloat>
 #define BOX_SIZE 1024
 
 #include "cuda_runtime.h"

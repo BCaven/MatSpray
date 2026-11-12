@@ -6,12 +6,17 @@ import torchvision
 from torchvision.transforms.functional import InterpolationMode
 from scene.cameras import Camera
 from utils.graphics_utils import focal2fov
-
+from scene.utils import load_img_rgb
 WARNED = False
 
 
-def loadCam(args, id, cam_info, resolution_scale):
-    orig_h, orig_w = cam_info.image.shape[:2]
+def loadCam(args, id, cam_info : CameraInfo, resolution_scale):
+
+    tmp_image = cam_info.image
+    if (tmp_image is None):
+        tmp_image = load_img_rgb(cam_info.image_path)
+
+    orig_h, orig_w = tmp_image.shape[:2]
 
     if args.resolution in [1, 2, 4, 8]:
         scale = resolution_scale * args.resolution
@@ -32,8 +37,9 @@ def loadCam(args, id, cam_info, resolution_scale):
         scale = global_down * resolution_scale
     resolution = (int(orig_h / scale), int(orig_w / scale))
 
-    if cam_info.image is not None:
-        image = torch.from_numpy(cam_info.image).float().permute(2, 0, 1)
+    if tmp_image is not None:
+        # BUG: this is *another* instance of extra memory, yippee
+        image = torch.from_numpy(tmp_image).float().permute(2, 0, 1)
         if scale == 1:
             resized_image_rgb = image
         else:
@@ -69,10 +75,14 @@ def loadCam(args, id, cam_info, resolution_scale):
         scale_fx /= scale
         scale_fy /= scale
 
+    # Release the image now that we arent using it anymore
+    # PROBLEM: now the Camera just stores *another* copy in the form of gt_image (and potentially depth, normal, image_mask)
+    # at least those are the resized versions
     return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T,
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY, fx=scale_fx, fy=scale_fy, cx=scale_cx, cy=scale_cy,
-                  image=gt_image, depth=resized_depth, normal=resized_normal, image_mask=resized_image_mask,
-                  image_name=cam_info.image_name, uid=id, data_device=args.data_device, image_path=cam_info.image_path)
+                  image=None, depth=None, normal=None, image_mask=None,
+                  image_name=cam_info.image_name, uid=id, data_device=args.data_device, image_path=cam_info.image_path,
+                  height=orig_h, width=orig_w, scale=scale)
 
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
